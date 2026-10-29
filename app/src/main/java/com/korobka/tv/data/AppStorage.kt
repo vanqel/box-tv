@@ -24,7 +24,8 @@ class AppStorage(context: Context) {
                         translation = obj.optString("translation", "").ifEmpty { null },
                         positionMs = obj.optLong("position_ms", 0),
                         durationMs = obj.optLong("duration_ms", 0),
-                        updatedAt = obj.optLong("updated_at", 0)
+                        updatedAt = obj.optLong("updated_at", 0),
+                        streamUrl = obj.optString("stream_url", "").ifEmpty { null }
                     )
                 )
             }
@@ -52,6 +53,7 @@ class AppStorage(context: Context) {
                 put("position_ms", it.positionMs)
                 put("duration_ms", it.durationMs)
                 put("updated_at", it.updatedAt)
+                put("stream_url", it.streamUrl ?: "")
             }
             arr.put(obj)
         }

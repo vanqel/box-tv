@@ -38,6 +38,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import android.graphics.Bitmap
+import android.media.MediaMetadataRetriever
+import androidx.compose.foundation.Image
+import androidx.compose.ui.graphics.asImageBitmap
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import coil.compose.AsyncImage
 import com.korobka.tv.data.AppStorage
 import com.korobka.tv.data.MediaItem
@@ -528,6 +534,38 @@ fun PremiumHeroBanner(item: PlaybackHistoryItem, isPortrait: Boolean = false, on
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
 
+    var pausedFrameBitmap by remember(item.itemId, item.positionMs, item.streamUrl) {
+        mutableStateOf<Bitmap?>(null)
+    }
+
+    // Extract exact video frame at the saved position (or 120s fallback) for the banner background
+    LaunchedEffect(item.itemId, item.positionMs, item.streamUrl) {
+        withContext(Dispatchers.IO) {
+            val hls = item.streamUrl
+            if (!hls.isNullOrEmpty()) {
+                var retriever: MediaMetadataRetriever? = null
+                try {
+                    retriever = MediaMetadataRetriever()
+                    val headers = hashMapOf(
+                        "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                    )
+                    retriever.setDataSource(hls, headers)
+                    // Convert positionMs to microseconds (coerce at least 5s)
+                    val targetUs = if (item.positionMs > 5000L) item.positionMs * 1000L else 120_000_000L
+                    val bmp = retriever.getFrameAtTime(targetUs, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                    if (bmp != null) {
+                        pausedFrameBitmap = bmp
+                    }
+                } catch (_: Exception) {
+                } finally {
+                    try {
+                        retriever?.release()
+                    } catch (_: Exception) {}
+                }
+            }
+        }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -543,8 +581,17 @@ fun PremiumHeroBanner(item: PlaybackHistoryItem, isPortrait: Boolean = false, on
             .clickable(interactionSource = interactionSource, indication = null) { onResume() }
             .focusable(interactionSource = interactionSource)
     ) {
-        // 1. Blurred Poster Background (heavily blurred backdrop)
-        if (item.poster != null) {
+        // 1. Blurred Background: Exact frame where stopped (blurred), fallback to blurred poster
+        if (pausedFrameBitmap != null) {
+            Image(
+                bitmap = pausedFrameBitmap!!.asImageBitmap(),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .blur(radius = 32.dp)
+            )
+        } else if (item.poster != null) {
             AsyncImage(
                 model = item.poster,
                 contentDescription = null,

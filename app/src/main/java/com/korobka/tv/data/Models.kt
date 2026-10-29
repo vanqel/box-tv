@@ -50,5 +50,6 @@ data class PlaybackHistoryItem(
     val translation: String?,
     val positionMs: Long,
     val durationMs: Long,
-    val updatedAt: Long
+    val updatedAt: Long,
+    val streamUrl: String? = null
 )

@@ -54,6 +54,12 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
+import android.graphics.Bitmap
+import android.media.MediaMetadataRetriever
+import androidx.compose.foundation.Image
+import androidx.compose.ui.graphics.asImageBitmap
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import com.korobka.tv.data.AppStorage
 import com.korobka.tv.data.PlaybackHistoryItem
 import com.korobka.tv.data.StreamSource
@@ -347,7 +353,8 @@ fun NativePlayerScreen(
                         translation = currentTranslation,
                         positionMs = exoplayer.currentPosition,
                         durationMs = exoplayer.duration,
-                        updatedAt = System.currentTimeMillis()
+                        updatedAt = System.currentTimeMillis(),
+                        streamUrl = streamSource?.streamUrl
                     )
                 )
             }
@@ -732,6 +739,7 @@ fun NativePlayerScreen(
                                     episodeNumber = ep.episodeNumber,
                                     isCurrent = isCurrent,
                                     posterUrl = poster,
+                                    hlsUrl = ep.hlsUrl,
                                     onFocused = { isAtDrawerTopState.value = false },
                                     onClick = {
                                         currentSeason = selectedDrawerSeason
@@ -1079,11 +1087,40 @@ fun HighContrastEpisodeCard(
     episodeNumber: Int,
     isCurrent: Boolean,
     posterUrl: String?,
+    hlsUrl: String? = null,
     onFocused: () -> Unit,
     onClick: () -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
+
+    var frameBitmap by remember(hlsUrl) { mutableStateOf<Bitmap?>(null) }
+
+    // Fetch video frame at 120 seconds in background coroutine
+    LaunchedEffect(hlsUrl) {
+        if (!hlsUrl.isNullOrEmpty()) {
+            withContext(Dispatchers.IO) {
+                var retriever: MediaMetadataRetriever? = null
+                try {
+                    retriever = MediaMetadataRetriever()
+                    val headers = hashMapOf(
+                        "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                    )
+                    retriever.setDataSource(hlsUrl, headers)
+                    // 120 seconds in microseconds = 120 * 1_000_000
+                    val bmp = retriever.getFrameAtTime(120_000_000L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                    if (bmp != null) {
+                        frameBitmap = bmp
+                    }
+                } catch (_: Exception) {
+                } finally {
+                    try {
+                        retriever?.release()
+                    } catch (_: Exception) {}
+                }
+            }
+        }
+    }
 
     LaunchedEffect(isFocused) {
         if (isFocused) onFocused()
@@ -1110,7 +1147,14 @@ fun HighContrastEpisodeCard(
                 .clip(RoundedCornerShape(8.dp))
                 .background(Color(0xFF181818))
         ) {
-            if (posterUrl != null) {
+            if (frameBitmap != null) {
+                Image(
+                    bitmap = frameBitmap!!.asImageBitmap(),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else if (posterUrl != null) {
                 AsyncImage(
                     model = posterUrl,
                     contentDescription = null,
