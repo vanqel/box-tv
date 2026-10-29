@@ -29,7 +29,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -390,6 +391,21 @@ fun NativePlayerScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFF0F0F0F))
+            .pointerInput(Unit) {
+                detectVerticalDragGestures { _, dragAmount ->
+                    if (dragAmount < -18f) { // Swipe up
+                        if (!isDrawerOpenState.value) {
+                            exoplayer.pause()
+                            isDrawerOpenState.value = true
+                        }
+                    } else if (dragAmount > 18f) { // Swipe down
+                        if (isDrawerOpenState.value) {
+                            isDrawerOpenState.value = false
+                            exoplayer.play()
+                        }
+                    }
+                }
+            }
             .clickable {
                 showOverlayUntilMs.longValue = System.currentTimeMillis() + 3500L
                 if (!isDrawerOpenState.value) {
@@ -482,6 +498,54 @@ fun NativePlayerScreen(
                             tint = Color.White
                         )
                     }
+                }
+            }
+        }
+
+        // Floating Pause Cue Button / Bottom drawer trigger
+        AnimatedVisibility(
+            visible = !exoplayer.isPlaying && !isDrawerOpenState.value && !isLoading,
+            enter = fadeIn() + slideInVertically { it / 2 },
+            exit = fadeOut() + slideOutVertically { it / 2 },
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = if (isPortrait) 32.dp else 48.dp)
+        ) {
+            val cueInteraction = remember { MutableInteractionSource() }
+            val isCueFocused by cueInteraction.collectIsFocusedAsState()
+
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(30.dp))
+                    .background(if (isCueFocused) Color.White else Color(0xDD222222))
+                    .border(
+                        width = if (isCueFocused) 1.5.dp else 1.dp,
+                        color = if (isCueFocused) Color.White else Color(0x55FFFFFF),
+                        shape = RoundedCornerShape(30.dp)
+                    )
+                    .clickable(interactionSource = cueInteraction, indication = null) {
+                        isDrawerOpenState.value = true
+                    }
+                    .focusable(interactionSource = cueInteraction)
+                    .padding(horizontal = 24.dp, vertical = 12.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.KeyboardArrowUp,
+                        contentDescription = null,
+                        tint = if (isCueFocused) Color.Black else Color.White,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Text(
+                        text = if (isPortrait) "Меню серий и настроек (свайп вверх)" else "Меню серий и настроек (стрелка вниз)",
+                        color = if (isCueFocused) Color.Black else Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp
+                    )
                 }
             }
         }
