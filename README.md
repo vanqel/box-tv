@@ -6,9 +6,9 @@
 
 ## 📺 Скриншоты с устройства Android TV
 
-| Главный экран (Hero + Продолжить просмотр) | Поиск и экранная клавиатура |
+| Главный экран (Hero + Продолжить просмотр) | Воспроизведение |
 |:---:|:---:|
-| ![Главная](screenshots/main_screen.png) | ![Поиск](screenshots/search_screen.png) |
+| ![Главная](screenshots/main_screen.png) | ![Воспроизведение](screenshots/search_screen.png) |
 
 ---
 
