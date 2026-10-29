@@ -27,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -68,8 +69,58 @@ fun MainTvScreen() {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF141414))
+            .background(Color(0xFF0E0E0E))
     ) {
+        // Atmospheric background radial gradients (warm orange & amber accents)
+        // 1. Top-right vibrant orange aura
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(
+                            Color(0x4DFF6600), // ~30% opacity vivid orange
+                            Color(0x22FF4500),
+                            Color.Transparent
+                        ),
+                        center = Offset(Float.POSITIVE_INFINITY, 50f),
+                        radius = 850f
+                    )
+                )
+        )
+        // 2. Middle-left accent glow (behind content/tabs on the left)
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(
+                            Color(0x38FF7700), // Warm bright glow on the left
+                            Color(0x15FF5500),
+                            Color.Transparent
+                        ),
+                        center = Offset(0f, 650f),
+                        radius = 750f
+                    )
+                )
+        )
+        // 3. Bottom-right subtle depth glow
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(
+                            Color(0x30E65100),
+                            Color(0x10BF360C),
+                            Color.Transparent
+                        ),
+                        center = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY),
+                        radius = 900f
+                    )
+                )
+        )
+
         Column(modifier = Modifier.fillMaxSize()) {
             // Top Navigation Header
             Row(
@@ -294,17 +345,17 @@ fun MainTvScreen() {
                 }
             } else {
                 // Search View
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = screenHorizontalPadding),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                    contentPadding = PaddingValues(bottom = 64.dp)
-                ) {
-                    item {
+                if (!isPortrait) {
+                    // Landscape / Android TV Layout: Fixed top keyboard (no scrolling on keys!), scrollable results below
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = screenHorizontalPadding),
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
                         NativeSearchKeyboard(
                             query = searchQuery,
-                            isPortrait = isPortrait,
+                            isPortrait = false,
                             onQueryChange = { searchQuery = it },
                             onSearch = {
                                 scope.launch {
@@ -314,25 +365,81 @@ fun MainTvScreen() {
                                 }
                             }
                         )
-                    }
 
-                    if (isSearching) {
-                        item {
-                            Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                        if (isSearching) {
+                            Box(modifier = Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
                                 CircularProgressIndicator(color = Color.White)
                             }
-                        }
-                    } else if (searchResults.isNotEmpty()) {
-                        item {
+                        } else if (searchResults.isNotEmpty()) {
                             Text(
                                 text = "Результаты (${searchResults.size}):",
-                                fontSize = 18.sp,
+                                fontSize = 17.sp,
                                 fontWeight = FontWeight.Black,
                                 color = Color.White
                             )
+
+                            LazyRow(
+                                horizontalArrangement = Arrangement.spacedBy(18.dp),
+                                contentPadding = PaddingValues(bottom = 32.dp)
+                            ) {
+                                items(searchResults) { m ->
+                                    PremiumPosterCard(
+                                        item = m,
+                                        isPortrait = false,
+                                        onClick = {
+                                            NativePlayerActivity.start(
+                                                context = context,
+                                                itemId = m.id,
+                                                title = m.title,
+                                                poster = m.poster,
+                                                isSeries = m.isSeries
+                                            )
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    // Portrait / Mobile Layout: Scrollable container for touchscreen
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = screenHorizontalPadding),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                        contentPadding = PaddingValues(bottom = 64.dp)
+                    ) {
+                        item {
+                            NativeSearchKeyboard(
+                                query = searchQuery,
+                                isPortrait = true,
+                                onQueryChange = { searchQuery = it },
+                                onSearch = {
+                                    scope.launch {
+                                        isSearching = true
+                                        searchResults = CdnEngine.search(searchQuery)
+                                        isSearching = false
+                                    }
+                                }
+                            )
                         }
 
-                        if (isPortrait) {
+                        if (isSearching) {
+                            item {
+                                Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                                    CircularProgressIndicator(color = Color.White)
+                                }
+                            }
+                        } else if (searchResults.isNotEmpty()) {
+                            item {
+                                Text(
+                                    text = "Результаты (${searchResults.size}):",
+                                    fontSize = 18.sp,
+                                    fontWeight = FontWeight.Black,
+                                    color = Color.White
+                                )
+                            }
+
                             item {
                                 Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                                     val chunked = searchResults.chunked(2)
@@ -362,29 +469,6 @@ fun MainTvScreen() {
                                                 Spacer(modifier = Modifier.weight(1f))
                                             }
                                         }
-                                    }
-                                }
-                            }
-                        } else {
-                            item {
-                                LazyRow(
-                                    horizontalArrangement = Arrangement.spacedBy(18.dp),
-                                    contentPadding = PaddingValues(vertical = 8.dp)
-                                ) {
-                                    items(searchResults) { m ->
-                                        PremiumPosterCard(
-                                            item = m,
-                                            isPortrait = false,
-                                            onClick = {
-                                                NativePlayerActivity.start(
-                                                    context = context,
-                                                    itemId = m.id,
-                                                    title = m.title,
-                                                    poster = m.poster,
-                                                    isSeries = m.isSeries
-                                                )
-                                            }
-                                        )
                                     }
                                 }
                             }
@@ -471,18 +555,34 @@ fun PremiumHeroBanner(item: PlaybackHistoryItem, isPortrait: Boolean = false, on
             )
         }
 
-        // 2. Cinematic Gradient overlay: dark on the left for text readability, fading softly to the right
+        // 2. Cinematic Gradient overlay with subtle warm ambient underglow
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(
                     Brush.horizontalGradient(
                         colors = listOf(
-                            Color(0xFA121212),
+                            Color(0xFA101010),
                             Color(0xEE121212),
-                            Color(0xB3121212),
-                            Color(0x66121212)
+                            Color(0xBD141414),
+                            Color(0x66181818)
                         )
+                    )
+                )
+        )
+        // Warm orange accent radial glow behind the poster area
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(
+                            Color(0x35FF6A00),
+                            Color(0x10FF4500),
+                            Color.Transparent
+                        ),
+                        center = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY * 0.5f),
+                        radius = 800f
                     )
                 )
         )
@@ -576,94 +676,116 @@ fun PremiumContinueCard(item: PlaybackHistoryItem, isPortrait: Boolean = false, 
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
 
-    Column(
+    Box(
         modifier = Modifier
             .then(if (isPortrait) Modifier.width(140.dp) else Modifier.width(160.dp))
-            .clip(RoundedCornerShape(14.dp))
-            .background(if (isFocused) Color.White else Color(0xFF262626))
-            .border(
-                width = if (isFocused) 1.5.dp else 1.dp,
-                color = if (isFocused) Color.White else Color(0x33FFFFFF),
-                shape = RoundedCornerShape(14.dp)
-            )
             .clickable(interactionSource = interactionSource, indication = null) { onClick() }
             .focusable(interactionSource = interactionSource)
-            .padding(8.dp)
     ) {
+        // Subtle ambient glow behind the card (warm orange/amber, active all the time, slightly stronger on focus)
         Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(2f / 3f)
-                .clip(RoundedCornerShape(10.dp))
-                .background(Color(0xFF141414)),
-            contentAlignment = Alignment.Center
-        ) {
-            if (item.poster != null) {
-                AsyncImage(
-                    model = item.poster,
-                    contentDescription = item.title,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
+                .matchParentSize()
+                .padding(2.dp)
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(
+                            if (isFocused) Color(0x40FF6A00) else Color(0x18FF7700),
+                            Color.Transparent
+                        ),
+                        radius = 350f
+                    ),
+                    shape = RoundedCornerShape(16.dp)
                 )
-            } else {
-                Column(
-                    modifier = Modifier.padding(12.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    Icon(
-                        imageVector = if (item.season != null) Icons.Default.Tv else Icons.Default.Movie,
-                        contentDescription = null,
-                        tint = Color(0xFF666666),
-                        modifier = Modifier.size(36.dp)
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = if (item.season != null) "Сериал" else "Фильм",
-                        color = Color(0xFF888888),
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
+        )
 
-            // Progress bar line at the bottom of the poster
-            if (item.durationMs > 0) {
-                val progress = (item.positionMs.toFloat() / item.durationMs.toFloat()).coerceIn(0f, 1f)
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(4.dp)
-                        .align(Alignment.BottomCenter)
-                        .background(Color(0x88000000))
-                ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(14.dp))
+                .background(if (isFocused) Color.White else Color(0xFF222222))
+                .border(
+                    width = if (isFocused) 1.5.dp else 1.dp,
+                    color = if (isFocused) Color.White else Color(0x33FFFFFF),
+                    shape = RoundedCornerShape(14.dp)
+                )
+                .padding(8.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(2f / 3f)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Color(0xFF141414)),
+                contentAlignment = Alignment.Center
+            ) {
+                if (item.poster != null) {
+                    AsyncImage(
+                        model = item.poster,
+                        contentDescription = item.title,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            imageVector = if (item.season != null) Icons.Default.Tv else Icons.Default.Movie,
+                            contentDescription = null,
+                            tint = Color(0xFF666666),
+                            modifier = Modifier.size(36.dp)
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = if (item.season != null) "Сериал" else "Фильм",
+                            color = Color(0xFF888888),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+
+                // Progress bar line at the bottom of the poster
+                if (item.durationMs > 0) {
+                    val progress = (item.positionMs.toFloat() / item.durationMs.toFloat()).coerceIn(0f, 1f)
                     Box(
                         modifier = Modifier
-                            .fillMaxWidth(progress)
-                            .fillMaxHeight()
-                            .background(Color(0xFFE50914))
-                    )
+                            .fillMaxWidth()
+                            .height(4.dp)
+                            .align(Alignment.BottomCenter)
+                            .background(Color(0x88000000))
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(progress)
+                                .fillMaxHeight()
+                                .background(Color(0xFFE50914))
+                        )
+                    }
                 }
             }
-        }
 
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = item.title,
-            maxLines = 2,
-            minLines = 2,
-            color = if (isFocused) Color.Black else Color.White,
-            fontWeight = FontWeight.Bold,
-            fontSize = 13.sp,
-            lineHeight = 17.sp
-        )
-        Text(
-            text = if (item.season != null) "С${item.season} • Серия ${item.episode}" else "Фильм",
-            maxLines = 1,
-            color = if (isFocused) Color(0xFF444444) else Color(0xFFAAAAAA),
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Medium
-        )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = item.title,
+                maxLines = 2,
+                minLines = 2,
+                color = if (isFocused) Color.Black else Color.White,
+                fontWeight = FontWeight.Bold,
+                fontSize = 13.sp,
+                lineHeight = 17.sp
+            )
+            Text(
+                text = if (item.season != null) "С${item.season} • Серия ${item.episode}" else "Фильм",
+                maxLines = 1,
+                color = if (isFocused) Color(0xFF444444) else Color(0xFFAAAAAA),
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium
+            )
+        }
     }
 }
 
@@ -672,75 +794,97 @@ fun PremiumPosterCard(item: MediaItem, isPortrait: Boolean = false, onClick: () 
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
 
-    Column(
+    Box(
         modifier = Modifier
             .then(if (isPortrait) Modifier.fillMaxWidth() else Modifier.width(160.dp))
-            .clip(RoundedCornerShape(14.dp))
-            .background(if (isFocused) Color.White else Color(0xFF262626))
-            .border(
-                width = if (isFocused) 1.5.dp else 1.dp,
-                color = if (isFocused) Color.White else Color(0x33FFFFFF),
-                shape = RoundedCornerShape(14.dp)
-            )
             .clickable(interactionSource = interactionSource, indication = null) { onClick() }
             .focusable(interactionSource = interactionSource)
-            .padding(8.dp)
     ) {
+        // Subtle ambient glow behind the card (warm orange/amber, active all the time, slightly stronger on focus)
         Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(2f / 3f)
-                .clip(RoundedCornerShape(10.dp))
-                .background(Color(0xFF141414)),
-            contentAlignment = Alignment.Center
-        ) {
-            if (item.poster != null) {
-                AsyncImage(
-                    model = item.poster,
-                    contentDescription = item.title,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
+                .matchParentSize()
+                .padding(2.dp)
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(
+                            if (isFocused) Color(0x40FF6A00) else Color(0x18FF7700),
+                            Color.Transparent
+                        ),
+                        radius = 350f
+                    ),
+                    shape = RoundedCornerShape(16.dp)
                 )
-            } else {
-                Column(
-                    modifier = Modifier.padding(12.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    Icon(
-                        imageVector = if (item.isSeries) Icons.Default.Tv else Icons.Default.Movie,
-                        contentDescription = null,
-                        tint = Color(0xFF666666),
-                        modifier = Modifier.size(36.dp)
+        )
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(14.dp))
+                .background(if (isFocused) Color.White else Color(0xFF222222))
+                .border(
+                    width = if (isFocused) 1.5.dp else 1.dp,
+                    color = if (isFocused) Color.White else Color(0x33FFFFFF),
+                    shape = RoundedCornerShape(14.dp)
+                )
+                .padding(8.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(2f / 3f)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Color(0xFF141414)),
+                contentAlignment = Alignment.Center
+            ) {
+                if (item.poster != null) {
+                    AsyncImage(
+                        model = item.poster,
+                        contentDescription = item.title,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
                     )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = if (item.isSeries) "Сериал" else "Фильм",
-                        color = Color(0xFF888888),
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold
-                    )
+                } else {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            imageVector = if (item.isSeries) Icons.Default.Tv else Icons.Default.Movie,
+                            contentDescription = null,
+                            tint = Color(0xFF666666),
+                            modifier = Modifier.size(36.dp)
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = if (item.isSeries) "Сериал" else "Фильм",
+                            color = Color(0xFF888888),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
             }
-        }
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = item.title,
-            maxLines = 2,
-            minLines = 2,
-            color = if (isFocused) Color.Black else Color.White,
-            fontWeight = FontWeight.Bold,
-            fontSize = 13.sp,
-            lineHeight = 17.sp
-        )
-        if (item.description != null) {
+            Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = item.description,
-                maxLines = 1,
-                color = if (isFocused) Color(0xFF444444) else Color(0xFFAAAAAA),
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Medium
+                text = item.title,
+                maxLines = 2,
+                minLines = 2,
+                color = if (isFocused) Color.Black else Color.White,
+                fontWeight = FontWeight.Bold,
+                fontSize = 13.sp,
+                lineHeight = 17.sp
             )
+            if (item.description != null) {
+                Text(
+                    text = item.description,
+                    maxLines = 1,
+                    color = if (isFocused) Color(0xFF444444) else Color(0xFFAAAAAA),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
         }
     }
 }
@@ -804,20 +948,20 @@ fun NativeSearchKeyboard(
             )
 
             rows.forEach { row ->
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     row.forEach { char ->
                         val interactionSource = remember { MutableInteractionSource() }
                         val isFocused by interactionSource.collectIsFocusedAsState()
 
                         Box(
                             modifier = Modifier
-                                .size(42.dp)
-                                .clip(RoundedCornerShape(8.dp))
+                                .size(36.dp)
+                                .clip(RoundedCornerShape(7.dp))
                                 .background(if (isFocused) Color.White else Color(0xFF333333))
                                 .border(
                                     width = if (isFocused) 1.5.dp else 0.5.dp,
                                     color = if (isFocused) Color.White else Color(0x22FFFFFF),
-                                    shape = RoundedCornerShape(8.dp)
+                                    shape = RoundedCornerShape(7.dp)
                                 )
                                 .clickable(interactionSource = interactionSource, indication = null) { onQueryChange(query + char) }
                                 .focusable(interactionSource = interactionSource),
@@ -827,23 +971,23 @@ fun NativeSearchKeyboard(
                                 text = char,
                                 color = if (isFocused) Color.Black else Color.White,
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 16.sp
+                                fontSize = 15.sp
                             )
                         }
                     }
                 }
             }
 
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 val spaceInteractionSource = remember { MutableInteractionSource() }
                 val isSpaceFocused by spaceInteractionSource.collectIsFocusedAsState()
                 Box(
                     modifier = Modifier
-                        .width(140.dp)
-                        .height(44.dp)
-                        .clip(RoundedCornerShape(10.dp))
+                        .width(130.dp)
+                        .height(38.dp)
+                        .clip(RoundedCornerShape(9.dp))
                         .background(if (isSpaceFocused) Color.White else Color(0xFF333333))
-                        .border(if (isSpaceFocused) 1.5.dp else 1.dp, if (isSpaceFocused) Color.White else Color(0x33FFFFFF), RoundedCornerShape(10.dp))
+                        .border(if (isSpaceFocused) 1.5.dp else 1.dp, if (isSpaceFocused) Color.White else Color(0x33FFFFFF), RoundedCornerShape(9.dp))
                         .clickable(interactionSource = spaceInteractionSource, indication = null) { onQueryChange("$query ") }
                         .focusable(interactionSource = spaceInteractionSource),
                     contentAlignment = Alignment.Center
@@ -852,7 +996,7 @@ fun NativeSearchKeyboard(
                         text = "Пробел",
                         color = if (isSpaceFocused) Color.Black else Color.White,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp
+                        fontSize = 13.sp
                     )
                 }
 
@@ -860,11 +1004,11 @@ fun NativeSearchKeyboard(
                 val isDelFocused by delInteractionSource.collectIsFocusedAsState()
                 Box(
                     modifier = Modifier
-                        .width(110.dp)
-                        .height(44.dp)
-                        .clip(RoundedCornerShape(10.dp))
+                        .width(100.dp)
+                        .height(38.dp)
+                        .clip(RoundedCornerShape(9.dp))
                         .background(if (isDelFocused) Color.White else Color(0xFF333333))
-                        .border(if (isDelFocused) 1.5.dp else 1.dp, if (isDelFocused) Color.White else Color(0x33FFFFFF), RoundedCornerShape(10.dp))
+                        .border(if (isDelFocused) 1.5.dp else 1.dp, if (isDelFocused) Color.White else Color(0x33FFFFFF), RoundedCornerShape(9.dp))
                         .clickable(interactionSource = delInteractionSource, indication = null) { if (query.isNotEmpty()) onQueryChange(query.dropLast(1)) }
                         .focusable(interactionSource = delInteractionSource),
                     contentAlignment = Alignment.Center
@@ -873,7 +1017,7 @@ fun NativeSearchKeyboard(
                         text = "Стереть",
                         color = if (isDelFocused) Color.Black else Color.White,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp
+                        fontSize = 13.sp
                     )
                 }
 
@@ -881,11 +1025,11 @@ fun NativeSearchKeyboard(
                 val isSearchFocused by searchInteractionSource.collectIsFocusedAsState()
                 Box(
                     modifier = Modifier
-                        .width(110.dp)
-                        .height(44.dp)
-                        .clip(RoundedCornerShape(10.dp))
+                        .width(100.dp)
+                        .height(38.dp)
+                        .clip(RoundedCornerShape(9.dp))
                         .background(if (isSearchFocused) Color.White else Color(0xFF444444))
-                        .border(if (isSearchFocused) 1.5.dp else 1.dp, if (isSearchFocused) Color.White else Color(0x33FFFFFF), RoundedCornerShape(10.dp))
+                        .border(if (isSearchFocused) 1.5.dp else 1.dp, if (isSearchFocused) Color.White else Color(0x33FFFFFF), RoundedCornerShape(9.dp))
                         .clickable(interactionSource = searchInteractionSource, indication = null) { onSearch() }
                         .focusable(interactionSource = searchInteractionSource),
                     contentAlignment = Alignment.Center
@@ -894,7 +1038,7 @@ fun NativeSearchKeyboard(
                         text = "Найти",
                         color = if (isSearchFocused) Color.Black else Color.White,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp
+                        fontSize = 13.sp
                     )
                 }
             }
