@@ -3,6 +3,7 @@ package com.korobka.tv.player
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ActivityInfo
+import android.content.res.Configuration
 import android.os.Bundle
 import android.view.KeyEvent
 import android.view.WindowManager
@@ -35,6 +36,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -380,10 +382,20 @@ fun NativePlayerScreen(
 
     val isTopOverlayVisible = !isDrawerOpenState.value && (nowMs < showOverlayUntilMs.longValue || !exoplayer.isPlaying)
 
+    val configuration = LocalConfiguration.current
+    val isPortrait = configuration.orientation == Configuration.ORIENTATION_PORTRAIT
+    val horizontalPadding = if (isPortrait) 16.dp else 48.dp
+
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFF0F0F0F))
+            .clickable {
+                showOverlayUntilMs.longValue = System.currentTimeMillis() + 3500L
+                if (!isDrawerOpenState.value) {
+                    if (exoplayer.isPlaying) exoplayer.pause() else exoplayer.play()
+                }
+            }
     ) {
         AndroidView(
             factory = { ctx ->
@@ -415,30 +427,62 @@ fun NativePlayerScreen(
                             colors = listOf(Color(0xDD000000), Color.Transparent)
                         )
                     )
-                    .padding(horizontal = 48.dp, vertical = 20.dp),
+                    .padding(horizontal = horizontalPadding, vertical = if (isPortrait) 36.dp else 20.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Column {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    IconButton(onClick = onClose) {
+                        Icon(
+                            imageVector = Icons.Default.ArrowBack,
+                            contentDescription = "Назад",
+                            tint = Color.White
+                        )
+                    }
+
+                    Column {
+                        Text(
+                            text = title,
+                            fontSize = if (isPortrait) 16.sp else 20.sp,
+                            fontWeight = FontWeight.Black,
+                            color = Color.White,
+                            maxLines = 1
+                        )
+                        Text(
+                            text = if (isSeries) "Сезон $currentSeason, Серия $currentEpisode • $currentTranslation" else currentTranslation,
+                            fontSize = 12.sp,
+                            color = Color(0xFFCCCCCC),
+                            maxLines = 1
+                        )
+                    }
+                }
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     Text(
-                        text = title,
-                        fontSize = 20.sp,
+                        text = "${formatDuration(curPosMs)} / ${formatDuration(totalDurMs)}",
+                        fontSize = if (isPortrait) 12.sp else 15.sp,
                         fontWeight = FontWeight.Black,
                         color = Color.White
                     )
-                    Text(
-                        text = if (isSeries) "Сезон $currentSeason, Серия $currentEpisode • $currentTranslation" else currentTranslation,
-                        fontSize = 13.sp,
-                        color = Color(0xFFCCCCCC)
-                    )
-                }
 
-                Text(
-                    text = "${formatDuration(curPosMs)} / ${formatDuration(totalDurMs)}",
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Black,
-                    color = Color.White
-                )
+                    IconButton(
+                        onClick = {
+                            isDrawerOpenState.value = !isDrawerOpenState.value
+                        }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Tune,
+                            contentDescription = "Настройки",
+                            tint = Color.White
+                        )
+                    }
+                }
             }
         }
 
@@ -465,9 +509,9 @@ fun NativePlayerScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .align(Alignment.BottomCenter)
-                    .padding(horizontal = 48.dp, vertical = 24.dp)
+                    .padding(horizontal = horizontalPadding, vertical = if (isPortrait) 16.dp else 24.dp)
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
@@ -475,7 +519,7 @@ fun NativePlayerScreen(
                     ) {
                         Text(
                             text = formatDuration(curPosMs),
-                            fontSize = 14.sp,
+                            fontSize = 13.sp,
                             fontWeight = FontWeight.Black,
                             color = Color.White
                         )
@@ -484,9 +528,12 @@ fun NativePlayerScreen(
                         Box(
                             modifier = Modifier
                                 .weight(1f)
-                                .height(6.dp)
+                                .height(8.dp)
                                 .clip(CircleShape)
                                 .background(Color(0xFF262626))
+                                .clickable {
+                                    // Touch to play/pause or scrub
+                                }
                         ) {
                             Box(
                                 modifier = Modifier
@@ -498,58 +545,66 @@ fun NativePlayerScreen(
 
                         Text(
                             text = formatDuration(totalDurMs),
-                            fontSize = 14.sp,
+                            fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color(0xFFAAAAAA)
                         )
                     }
 
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        HighContrastButton(
-                            text = "Озвучка: $currentTranslation",
-                            icon = Icons.Default.VolumeUp,
-                            modifier = Modifier
-                                .focusRequester(firstDrawerFocusRequester)
-                                .onFocusChanged { if (it.isFocused) isAtDrawerTopState.value = true },
-                            onClick = { activeDialog = "audio" }
-                        )
+                        item {
+                            HighContrastButton(
+                                text = "Озвучка: $currentTranslation",
+                                icon = Icons.Default.VolumeUp,
+                                modifier = Modifier
+                                    .focusRequester(firstDrawerFocusRequester)
+                                    .onFocusChanged { if (it.isFocused) isAtDrawerTopState.value = true },
+                                onClick = { activeDialog = "audio" }
+                            )
+                        }
 
-                        HighContrastButton(
-                            text = "Качество: $currentQuality",
-                            icon = Icons.Default.Settings,
-                            modifier = Modifier.onFocusChanged { if (it.isFocused) isAtDrawerTopState.value = true },
-                            onClick = { activeDialog = "quality" }
-                        )
+                        item {
+                            HighContrastButton(
+                                text = "Качество: $currentQuality",
+                                icon = Icons.Default.Settings,
+                                modifier = Modifier.onFocusChanged { if (it.isFocused) isAtDrawerTopState.value = true },
+                                onClick = { activeDialog = "quality" }
+                            )
+                        }
 
-                        HighContrastButton(
-                            text = if (isFavorite) "В избранном" else "В избранное",
-                            icon = if (isFavorite) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
-                            modifier = Modifier.onFocusChanged { if (it.isFocused) isAtDrawerTopState.value = true },
-                            onClick = {
-                                val res = storage.toggleFavorite(
-                                    com.korobka.tv.data.MediaItem(
-                                        id = itemId,
-                                        title = title,
-                                        poster = poster,
-                                        isSeries = isSeries
+                        item {
+                            HighContrastButton(
+                                text = if (isFavorite) "В избранном" else "В избранное",
+                                icon = if (isFavorite) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                                modifier = Modifier.onFocusChanged { if (it.isFocused) isAtDrawerTopState.value = true },
+                                onClick = {
+                                    val res = storage.toggleFavorite(
+                                        com.korobka.tv.data.MediaItem(
+                                            id = itemId,
+                                            title = title,
+                                            poster = poster,
+                                            isSeries = isSeries
+                                        )
                                     )
-                                )
-                                isFavorite = res
-                            }
-                        )
+                                    isFavorite = res
+                                }
+                            )
+                        }
 
-                        HighContrastButton(
-                            text = "Продолжить",
-                            icon = Icons.Default.PlayArrow,
-                            modifier = Modifier.onFocusChanged { if (it.isFocused) isAtDrawerTopState.value = true },
-                            onClick = {
-                                isDrawerOpenState.value = false
-                                exoplayer.play()
-                            }
-                        )
+                        item {
+                            HighContrastButton(
+                                text = "Продолжить",
+                                icon = Icons.Default.PlayArrow,
+                                modifier = Modifier.onFocusChanged { if (it.isFocused) isAtDrawerTopState.value = true },
+                                onClick = {
+                                    isDrawerOpenState.value = false
+                                    exoplayer.play()
+                                }
+                            )
+                        }
                     }
 
                     if (isSeries && streamSource?.seasons?.isNotEmpty() == true) {
@@ -632,7 +687,7 @@ fun NativePlayerScreen(
             ) {
                 Column(
                     modifier = Modifier
-                        .width(380.dp)
+                        .fillMaxWidth(if (isPortrait) 0.92f else 0.45f)
                         .clip(RoundedCornerShape(20.dp))
                         .background(Color(0xFF1E1E1E))
                         .border(2.dp, Color(0xFF333333), RoundedCornerShape(20.dp))
@@ -709,7 +764,7 @@ fun NativePlayerScreen(
             ) {
                 Column(
                     modifier = Modifier
-                        .width(340.dp)
+                        .fillMaxWidth(if (isPortrait) 0.88f else 0.4f)
                         .clip(RoundedCornerShape(20.dp))
                         .background(Color(0xFF1E1E1E))
                         .border(2.dp, Color(0xFF333333), RoundedCornerShape(20.dp))
@@ -774,7 +829,7 @@ fun NativePlayerScreen(
             }
         }
 
-        // 7. Next Episode Prompt Dialog
+        // 8. Next Episode Prompt Dialog
         if (showNextEpisodeDialog && isSeries) {
             val allSeasons = streamSource?.seasons.orEmpty()
             val currentSeasonData = allSeasons.find { it.seasonNumber == currentSeason }
@@ -807,7 +862,7 @@ fun NativePlayerScreen(
             ) {
                 Column(
                     modifier = Modifier
-                        .width(420.dp)
+                        .fillMaxWidth(if (isPortrait) 0.92f else 0.5f)
                         .clip(RoundedCornerShape(24.dp))
                         .background(Color(0xFF1E1E1E))
                         .border(2.dp, Color(0xFF333333), RoundedCornerShape(24.dp))

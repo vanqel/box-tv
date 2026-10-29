@@ -1,5 +1,6 @@
 package com.korobka.tv.ui
 
+import android.content.res.Configuration
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -9,9 +10,14 @@ import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -23,8 +29,11 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
@@ -51,6 +60,10 @@ fun MainTvScreen() {
 
     val latestWatched = history.firstOrNull()
 
+    val configuration = LocalConfiguration.current
+    val isPortrait = configuration.orientation == Configuration.ORIENTATION_PORTRAIT
+    val screenHorizontalPadding = if (isPortrait) 16.dp else 48.dp
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -61,18 +74,23 @@ fun MainTvScreen() {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 48.dp, vertical = 24.dp),
+                    .padding(
+                        start = screenHorizontalPadding,
+                        end = screenHorizontalPadding,
+                        top = if (isPortrait) 36.dp else 24.dp,
+                        bottom = if (isPortrait) 16.dp else 24.dp
+                    ),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(38.dp)
-                            .clip(RoundedCornerShape(10.dp))
+                            .size(if (isPortrait) 32.dp else 38.dp)
+                            .clip(RoundedCornerShape(8.dp))
                             .background(Color.White),
                         contentAlignment = Alignment.Center
                     ) {
@@ -80,20 +98,20 @@ fun MainTvScreen() {
                             imageVector = Icons.Default.Tv,
                             contentDescription = null,
                             tint = Color.Black,
-                            modifier = Modifier.size(22.dp)
+                            modifier = Modifier.size(if (isPortrait) 18.dp else 22.dp)
                         )
                     }
 
                     Text(
                         text = "Коробка",
-                        fontSize = 24.sp,
+                        fontSize = if (isPortrait) 20.sp else 24.sp,
                         fontWeight = FontWeight.Black,
                         color = Color.White,
                         letterSpacing = (-0.5).sp
                     )
                 }
 
-                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     PremiumNavTab(
                         title = "Главная",
                         icon = Icons.Default.Home,
@@ -123,6 +141,7 @@ fun MainTvScreen() {
                         item {
                             PremiumHeroBanner(
                                 item = latestWatched,
+                                isPortrait = isPortrait,
                                 onResume = {
                                     NativePlayerActivity.start(
                                         context = context,
@@ -145,48 +164,49 @@ fun MainTvScreen() {
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 48.dp, vertical = 20.dp)
+                                .padding(horizontal = screenHorizontalPadding, vertical = if (isPortrait) 12.dp else 20.dp)
                         ) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.History,
                                     contentDescription = null,
                                     tint = Color.White,
-                                    modifier = Modifier.size(22.dp)
+                                    modifier = Modifier.size(if (isPortrait) 18.dp else 22.dp)
                                 )
                                 Text(
                                     text = "Продолжить просмотр",
-                                    fontSize = 20.sp,
+                                    fontSize = if (isPortrait) 17.sp else 20.sp,
                                     fontWeight = FontWeight.Black,
                                     color = Color.White
                                 )
                             }
-                            Spacer(modifier = Modifier.height(16.dp))
+                            Spacer(modifier = Modifier.height(12.dp))
 
                             if (history.isEmpty()) {
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .clip(RoundedCornerShape(16.dp))
+                                        .clip(RoundedCornerShape(14.dp))
                                         .background(Color(0xFF222222))
-                                        .padding(32.dp),
+                                        .padding(24.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Text(
                                         text = "Вы ещё ничего не смотрели. Найдите фильм или сериал через поиск!",
                                         color = Color(0xFFAAAAAA),
-                                        fontSize = 15.sp,
+                                        fontSize = 14.sp,
                                         fontWeight = FontWeight.Medium
                                     )
                                 }
                             } else {
-                                LazyRow(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+                                LazyRow(horizontalArrangement = Arrangement.spacedBy(if (isPortrait) 14.dp else 20.dp)) {
                                     items(history) { h ->
                                         PremiumContinueCard(
                                             item = h,
+                                            isPortrait = isPortrait,
                                             onClick = {
                                                 NativePlayerActivity.start(
                                                     context = context,
@@ -212,48 +232,49 @@ fun MainTvScreen() {
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 48.dp, vertical = 20.dp)
+                                .padding(horizontal = screenHorizontalPadding, vertical = if (isPortrait) 12.dp else 20.dp)
                         ) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Bookmark,
                                     contentDescription = null,
                                     tint = Color.White,
-                                    modifier = Modifier.size(22.dp)
+                                    modifier = Modifier.size(if (isPortrait) 18.dp else 22.dp)
                                 )
                                 Text(
                                     text = "Избранное",
-                                    fontSize = 20.sp,
+                                    fontSize = if (isPortrait) 17.sp else 20.sp,
                                     fontWeight = FontWeight.Black,
                                     color = Color.White
                                 )
                             }
-                            Spacer(modifier = Modifier.height(16.dp))
+                            Spacer(modifier = Modifier.height(12.dp))
 
                             if (favorites.isEmpty()) {
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .clip(RoundedCornerShape(16.dp))
+                                        .clip(RoundedCornerShape(14.dp))
                                         .background(Color(0xFF222222))
-                                        .padding(32.dp),
+                                        .padding(24.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Text(
                                         text = "Список избранного пуст. Добавляйте фильмы во время просмотра!",
                                         color = Color(0xFFAAAAAA),
-                                        fontSize = 15.sp,
+                                        fontSize = 14.sp,
                                         fontWeight = FontWeight.Medium
                                     )
                                 }
                             } else {
-                                LazyRow(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+                                LazyRow(horizontalArrangement = Arrangement.spacedBy(if (isPortrait) 14.dp else 20.dp)) {
                                     items(favorites) { f ->
                                         PremiumPosterCard(
                                             item = f,
+                                            isPortrait = isPortrait,
                                             onClick = {
                                                 NativePlayerActivity.start(
                                                     context = context,
@@ -275,11 +296,12 @@ fun MainTvScreen() {
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 48.dp),
-                    verticalArrangement = Arrangement.spacedBy(20.dp)
+                        .padding(horizontal = screenHorizontalPadding),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     NativeSearchKeyboard(
                         query = searchQuery,
+                        isPortrait = isPortrait,
                         onQueryChange = { searchQuery = it },
                         onSearch = {
                             scope.launch {
@@ -302,20 +324,47 @@ fun MainTvScreen() {
                             color = Color.White
                         )
 
-                        LazyRow(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-                            items(searchResults) { m ->
-                                PremiumPosterCard(
-                                    item = m,
-                                    onClick = {
-                                        NativePlayerActivity.start(
-                                            context = context,
-                                            itemId = m.id,
-                                            title = m.title,
-                                            poster = m.poster,
-                                            isSeries = m.isSeries
-                                        )
-                                    }
-                                )
+                        if (isPortrait) {
+                            LazyVerticalGrid(
+                                columns = GridCells.Fixed(2),
+                                modifier = Modifier.fillMaxSize(),
+                                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                                verticalArrangement = Arrangement.spacedBy(14.dp),
+                                contentPadding = PaddingValues(bottom = 56.dp)
+                            ) {
+                                items(searchResults) { m ->
+                                    PremiumPosterCard(
+                                        item = m,
+                                        isPortrait = true,
+                                        onClick = {
+                                            NativePlayerActivity.start(
+                                                context = context,
+                                                itemId = m.id,
+                                                title = m.title,
+                                                poster = m.poster,
+                                                isSeries = m.isSeries
+                                            )
+                                        }
+                                    )
+                                }
+                            }
+                        } else {
+                            LazyRow(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+                                items(searchResults) { m ->
+                                    PremiumPosterCard(
+                                        item = m,
+                                        isPortrait = false,
+                                        onClick = {
+                                            NativePlayerActivity.start(
+                                                context = context,
+                                                itemId = m.id,
+                                                title = m.title,
+                                                poster = m.poster,
+                                                isSeries = m.isSeries
+                                            )
+                                        }
+                                    )
+                                }
                             }
                         }
                     }
@@ -369,21 +418,21 @@ fun PremiumNavTab(
 }
 
 @Composable
-fun PremiumHeroBanner(item: PlaybackHistoryItem, onResume: () -> Unit) {
+fun PremiumHeroBanner(item: PlaybackHistoryItem, isPortrait: Boolean = false, onResume: () -> Unit) {
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(310.dp)
-            .padding(horizontal = 48.dp)
-            .clip(RoundedCornerShape(20.dp))
+            .height(if (isPortrait) 200.dp else 310.dp)
+            .padding(horizontal = if (isPortrait) 16.dp else 48.dp)
+            .clip(RoundedCornerShape(if (isPortrait) 16.dp else 20.dp))
             .background(Color(0xFF222222))
             .border(
                 width = if (isFocused) 2.dp else 1.dp,
                 color = if (isFocused) Color.White else Color(0x33FFFFFF),
-                shape = RoundedCornerShape(20.dp)
+                shape = RoundedCornerShape(if (isPortrait) 16.dp else 20.dp)
             )
             .clickable(interactionSource = interactionSource, indication = null) { onResume() }
             .focusable(interactionSource = interactionSource)
@@ -415,44 +464,45 @@ fun PremiumHeroBanner(item: PlaybackHistoryItem, onResume: () -> Unit) {
         Column(
             modifier = Modifier
                 .align(Alignment.BottomStart)
-                .padding(32.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+                .padding(if (isPortrait) 16.dp else 32.dp),
+            verticalArrangement = Arrangement.spacedBy(if (isPortrait) 6.dp else 10.dp)
         ) {
             Text(
                 text = item.title,
-                fontSize = 32.sp,
+                fontSize = if (isPortrait) 20.sp else 32.sp,
                 fontWeight = FontWeight.Black,
-                color = Color.White
+                color = Color.White,
+                maxLines = 1
             )
 
             Text(
                 text = if (item.season != null && item.episode != null) "Сезон ${item.season}, Серия ${item.episode}" else "Фильм",
-                fontSize = 15.sp,
+                fontSize = if (isPortrait) 13.sp else 15.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color(0xFFAAAAAA)
             )
 
             Box(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(RoundedCornerShape(10.dp))
                     .background(Color.White)
-                    .padding(horizontal = 24.dp, vertical = 12.dp)
+                    .padding(horizontal = if (isPortrait) 16.dp else 24.dp, vertical = if (isPortrait) 8.dp else 12.dp)
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.PlayArrow,
                         contentDescription = null,
                         tint = Color.Black,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(if (isPortrait) 16.dp else 20.dp)
                     )
                     Text(
-                        text = "Продолжить просмотр",
+                        text = "Смотреть",
                         color = Color.Black,
                         fontWeight = FontWeight.Black,
-                        fontSize = 14.sp
+                        fontSize = if (isPortrait) 12.sp else 14.sp
                     )
                 }
             }
@@ -461,13 +511,13 @@ fun PremiumHeroBanner(item: PlaybackHistoryItem, onResume: () -> Unit) {
 }
 
 @Composable
-fun PremiumContinueCard(item: PlaybackHistoryItem, onClick: () -> Unit) {
+fun PremiumContinueCard(item: PlaybackHistoryItem, isPortrait: Boolean = false, onClick: () -> Unit) {
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
 
     Column(
         modifier = Modifier
-            .width(220.dp)
+            .width(if (isPortrait) 160.dp else 220.dp)
             .clip(RoundedCornerShape(14.dp))
             .background(if (isFocused) Color.White else Color(0xFF262626))
             .border(
@@ -498,7 +548,7 @@ fun PremiumContinueCard(item: PlaybackHistoryItem, onClick: () -> Unit) {
             Box(
                 modifier = Modifier
                     .align(Alignment.Center)
-                    .size(32.dp)
+                    .size(28.dp)
                     .clip(CircleShape)
                     .background(if (isFocused) Color.Black else Color(0x99000000)),
                 contentAlignment = Alignment.Center
@@ -507,36 +557,36 @@ fun PremiumContinueCard(item: PlaybackHistoryItem, onClick: () -> Unit) {
                     imageVector = Icons.Default.PlayArrow,
                     contentDescription = null,
                     tint = Color.White,
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(16.dp)
                 )
             }
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(6.dp))
         Text(
             text = item.title,
             maxLines = 1,
             color = if (isFocused) Color.Black else Color.White,
             fontWeight = FontWeight.Bold,
-            fontSize = 14.sp
+            fontSize = if (isPortrait) 13.sp else 14.sp
         )
         Text(
             text = if (item.season != null) "С${item.season} • Серия ${item.episode}" else "Фильм",
             color = if (isFocused) Color(0xFF333333) else Color(0xFFAAAAAA),
-            fontSize = 12.sp,
+            fontSize = 11.sp,
             fontWeight = FontWeight.Medium
         )
     }
 }
 
 @Composable
-fun PremiumPosterCard(item: MediaItem, onClick: () -> Unit) {
+fun PremiumPosterCard(item: MediaItem, isPortrait: Boolean = false, onClick: () -> Unit) {
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
 
     Column(
         modifier = Modifier
-            .width(160.dp)
+            .then(if (isPortrait) Modifier.fillMaxWidth() else Modifier.width(160.dp))
             .clip(RoundedCornerShape(14.dp))
             .background(if (isFocused) Color.White else Color(0xFF262626))
             .border(
@@ -564,7 +614,7 @@ fun PremiumPosterCard(item: MediaItem, onClick: () -> Unit) {
                 )
             }
         }
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(6.dp))
         Text(
             text = item.title,
             maxLines = 1,
@@ -578,126 +628,155 @@ fun PremiumPosterCard(item: MediaItem, onClick: () -> Unit) {
 @Composable
 fun NativeSearchKeyboard(
     query: String,
+    isPortrait: Boolean = false,
     onQueryChange: (String) -> Unit,
     onSearch: () -> Unit
 ) {
-    val rows = listOf(
-        listOf("Й", "Ц", "У", "К", "Е", "Н", "Г", "Ш", "Щ", "З", "Х"),
-        listOf("Ф", "Ы", "В", "А", "П", "Р", "О", "Л", "Д", "Ж", "Э"),
-        listOf("Я", "Ч", "С", "М", "И", "Т", "Ь", "Б", "Ю", "1", "2")
-    )
+    val keyboardController = LocalSoftwareKeyboardController.current
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
+            .clip(RoundedCornerShape(16.dp))
             .background(Color(0xFF222222))
-            .border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(20.dp))
-            .padding(20.dp),
+            .border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(16.dp))
+            .padding(if (isPortrait) 14.dp else 20.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(
-            text = if (query.isEmpty()) "Введите название фильма..." else query,
-            fontSize = 20.sp,
-            color = if (query.isEmpty()) Color(0xFF737373) else Color.White,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(bottom = 6.dp)
+        // Native touch text input for smartphones & tablets
+        OutlinedTextField(
+            value = query,
+            onValueChange = onQueryChange,
+            placeholder = { Text("Поиск фильмов и сериалов...", color = Color(0xFF737373)) },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedTextColor = Color.White,
+                unfocusedTextColor = Color.White,
+                focusedBorderColor = Color.White,
+                unfocusedBorderColor = Color(0x44FFFFFF),
+                cursorColor = Color.White
+            ),
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+            keyboardActions = KeyboardActions(
+                onSearch = {
+                    keyboardController?.hide()
+                    onSearch()
+                }
+            ),
+            trailingIcon = {
+                IconButton(onClick = {
+                    keyboardController?.hide()
+                    onSearch()
+                }) {
+                    Icon(imageVector = Icons.Default.Search, contentDescription = "Поиск", tint = Color.White)
+                }
+            }
         )
 
-        rows.forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                row.forEach { char ->
-                    val interactionSource = remember { MutableInteractionSource() }
-                    val isFocused by interactionSource.collectIsFocusedAsState()
+        // D-pad onscreen keyboard (shown on landscape / TV screen)
+        if (!isPortrait) {
+            val rows = listOf(
+                listOf("Й", "Ц", "У", "К", "Е", "Н", "Г", "Ш", "Щ", "З", "Х"),
+                listOf("Ф", "Ы", "В", "А", "П", "Р", "О", "Л", "Д", "Ж", "Э"),
+                listOf("Я", "Ч", "С", "М", "И", "Т", "Ь", "Б", "Ю", "1", "2")
+            )
 
-                    Box(
-                        modifier = Modifier
-                            .size(42.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(if (isFocused) Color.White else Color(0xFF333333))
-                            .border(
-                                width = if (isFocused) 1.5.dp else 0.5.dp,
-                                color = if (isFocused) Color.White else Color(0x22FFFFFF),
-                                shape = RoundedCornerShape(8.dp)
+            rows.forEach { row ->
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    row.forEach { char ->
+                        val interactionSource = remember { MutableInteractionSource() }
+                        val isFocused by interactionSource.collectIsFocusedAsState()
+
+                        Box(
+                            modifier = Modifier
+                                .size(42.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(if (isFocused) Color.White else Color(0xFF333333))
+                                .border(
+                                    width = if (isFocused) 1.5.dp else 0.5.dp,
+                                    color = if (isFocused) Color.White else Color(0x22FFFFFF),
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+                                .clickable(interactionSource = interactionSource, indication = null) { onQueryChange(query + char) }
+                                .focusable(interactionSource = interactionSource),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = char,
+                                color = if (isFocused) Color.Black else Color.White,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 16.sp
                             )
-                            .clickable(interactionSource = interactionSource, indication = null) { onQueryChange(query + char) }
-                            .focusable(interactionSource = interactionSource),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = char,
-                            color = if (isFocused) Color.Black else Color.White,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 16.sp
-                        )
+                        }
                     }
                 }
             }
-        }
 
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            val spaceInteractionSource = remember { MutableInteractionSource() }
-            val isSpaceFocused by spaceInteractionSource.collectIsFocusedAsState()
-            Box(
-                modifier = Modifier
-                    .width(140.dp)
-                    .height(44.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(if (isSpaceFocused) Color.White else Color(0xFF333333))
-                    .border(if (isSpaceFocused) 1.5.dp else 1.dp, if (isSpaceFocused) Color.White else Color(0x33FFFFFF), RoundedCornerShape(10.dp))
-                    .clickable(interactionSource = spaceInteractionSource, indication = null) { onQueryChange("$query ") }
-                    .focusable(interactionSource = spaceInteractionSource),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "Пробел",
-                    color = if (isSpaceFocused) Color.Black else Color.White,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp
-                )
-            }
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                val spaceInteractionSource = remember { MutableInteractionSource() }
+                val isSpaceFocused by spaceInteractionSource.collectIsFocusedAsState()
+                Box(
+                    modifier = Modifier
+                        .width(140.dp)
+                        .height(44.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(if (isSpaceFocused) Color.White else Color(0xFF333333))
+                        .border(if (isSpaceFocused) 1.5.dp else 1.dp, if (isSpaceFocused) Color.White else Color(0x33FFFFFF), RoundedCornerShape(10.dp))
+                        .clickable(interactionSource = spaceInteractionSource, indication = null) { onQueryChange("$query ") }
+                        .focusable(interactionSource = spaceInteractionSource),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "Пробел",
+                        color = if (isSpaceFocused) Color.Black else Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp
+                    )
+                }
 
-            val delInteractionSource = remember { MutableInteractionSource() }
-            val isDelFocused by delInteractionSource.collectIsFocusedAsState()
-            Box(
-                modifier = Modifier
-                    .width(110.dp)
-                    .height(44.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(if (isDelFocused) Color.White else Color(0xFF333333))
-                    .border(if (isDelFocused) 1.5.dp else 1.dp, if (isDelFocused) Color.White else Color(0x33FFFFFF), RoundedCornerShape(10.dp))
-                    .clickable(interactionSource = delInteractionSource, indication = null) { if (query.isNotEmpty()) onQueryChange(query.dropLast(1)) }
-                    .focusable(interactionSource = delInteractionSource),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "Стереть",
-                    color = if (isDelFocused) Color.Black else Color.White,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp
-                )
-            }
+                val delInteractionSource = remember { MutableInteractionSource() }
+                val isDelFocused by delInteractionSource.collectIsFocusedAsState()
+                Box(
+                    modifier = Modifier
+                        .width(110.dp)
+                        .height(44.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(if (isDelFocused) Color.White else Color(0xFF333333))
+                        .border(if (isDelFocused) 1.5.dp else 1.dp, if (isDelFocused) Color.White else Color(0x33FFFFFF), RoundedCornerShape(10.dp))
+                        .clickable(interactionSource = delInteractionSource, indication = null) { if (query.isNotEmpty()) onQueryChange(query.dropLast(1)) }
+                        .focusable(interactionSource = delInteractionSource),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "Стереть",
+                        color = if (isDelFocused) Color.Black else Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp
+                    )
+                }
 
-            val searchInteractionSource = remember { MutableInteractionSource() }
-            val isSearchFocused by searchInteractionSource.collectIsFocusedAsState()
-            Box(
-                modifier = Modifier
-                    .width(110.dp)
-                    .height(44.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(if (isSearchFocused) Color.White else Color(0xFF444444))
-                    .border(if (isSearchFocused) 1.5.dp else 1.dp, if (isSearchFocused) Color.White else Color(0x33FFFFFF), RoundedCornerShape(10.dp))
-                    .clickable(interactionSource = searchInteractionSource, indication = null) { onSearch() }
-                    .focusable(interactionSource = searchInteractionSource),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "Найти",
-                    color = if (isSearchFocused) Color.Black else Color.White,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp
-                )
+                val searchInteractionSource = remember { MutableInteractionSource() }
+                val isSearchFocused by searchInteractionSource.collectIsFocusedAsState()
+                Box(
+                    modifier = Modifier
+                        .width(110.dp)
+                        .height(44.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(if (isSearchFocused) Color.White else Color(0xFF444444))
+                        .border(if (isSearchFocused) 1.5.dp else 1.dp, if (isSearchFocused) Color.White else Color(0x33FFFFFF), RoundedCornerShape(10.dp))
+                        .clickable(interactionSource = searchInteractionSource, indication = null) { onSearch() }
+                        .focusable(interactionSource = searchInteractionSource),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "Найти",
+                        color = if (isSearchFocused) Color.Black else Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp
+                    )
+                }
             }
         }
     }
