@@ -24,6 +24,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
@@ -293,77 +294,98 @@ fun MainTvScreen() {
                 }
             } else {
                 // Search View
-                Column(
+                LazyColumn(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(horizontal = screenHorizontalPadding),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    contentPadding = PaddingValues(bottom = 64.dp)
                 ) {
-                    NativeSearchKeyboard(
-                        query = searchQuery,
-                        isPortrait = isPortrait,
-                        onQueryChange = { searchQuery = it },
-                        onSearch = {
-                            scope.launch {
-                                isSearching = true
-                                searchResults = CdnEngine.search(searchQuery)
-                                isSearching = false
+                    item {
+                        NativeSearchKeyboard(
+                            query = searchQuery,
+                            isPortrait = isPortrait,
+                            onQueryChange = { searchQuery = it },
+                            onSearch = {
+                                scope.launch {
+                                    isSearching = true
+                                    searchResults = CdnEngine.search(searchQuery)
+                                    isSearching = false
+                                }
                             }
-                        }
-                    )
+                        )
+                    }
 
                     if (isSearching) {
-                        Box(modifier = Modifier.fillMaxWidth().padding(48.dp), contentAlignment = Alignment.Center) {
-                            CircularProgressIndicator(color = Color.White)
+                        item {
+                            Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                                CircularProgressIndicator(color = Color.White)
+                            }
                         }
                     } else if (searchResults.isNotEmpty()) {
-                        Text(
-                            text = "Результаты (${searchResults.size}):",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Black,
-                            color = Color.White
-                        )
+                        item {
+                            Text(
+                                text = "Результаты (${searchResults.size}):",
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Black,
+                                color = Color.White
+                            )
+                        }
 
                         if (isPortrait) {
-                            LazyVerticalGrid(
-                                columns = GridCells.Fixed(2),
-                                modifier = Modifier.fillMaxSize(),
-                                horizontalArrangement = Arrangement.spacedBy(14.dp),
-                                verticalArrangement = Arrangement.spacedBy(14.dp),
-                                contentPadding = PaddingValues(bottom = 56.dp)
-                            ) {
-                                items(searchResults) { m ->
-                                    PremiumPosterCard(
-                                        item = m,
-                                        isPortrait = true,
-                                        onClick = {
-                                            NativePlayerActivity.start(
-                                                context = context,
-                                                itemId = m.id,
-                                                title = m.title,
-                                                poster = m.poster,
-                                                isSeries = m.isSeries
-                                            )
+                            item {
+                                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                                    val chunked = searchResults.chunked(2)
+                                    chunked.forEach { rowItems ->
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(14.dp)
+                                        ) {
+                                            rowItems.forEach { m ->
+                                                Box(modifier = Modifier.weight(1f)) {
+                                                    PremiumPosterCard(
+                                                        item = m,
+                                                        isPortrait = true,
+                                                        onClick = {
+                                                            NativePlayerActivity.start(
+                                                                context = context,
+                                                                itemId = m.id,
+                                                                title = m.title,
+                                                                poster = m.poster,
+                                                                isSeries = m.isSeries
+                                                            )
+                                                        }
+                                                    )
+                                                }
+                                            }
+                                            if (rowItems.size == 1) {
+                                                Spacer(modifier = Modifier.weight(1f))
+                                            }
                                         }
-                                    )
+                                    }
                                 }
                             }
                         } else {
-                            LazyRow(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-                                items(searchResults) { m ->
-                                    PremiumPosterCard(
-                                        item = m,
-                                        isPortrait = false,
-                                        onClick = {
-                                            NativePlayerActivity.start(
-                                                context = context,
-                                                itemId = m.id,
-                                                title = m.title,
-                                                poster = m.poster,
-                                                isSeries = m.isSeries
-                                            )
-                                        }
-                                    )
+                            item {
+                                LazyRow(
+                                    horizontalArrangement = Arrangement.spacedBy(18.dp),
+                                    contentPadding = PaddingValues(vertical = 8.dp)
+                                ) {
+                                    items(searchResults) { m ->
+                                        PremiumPosterCard(
+                                            item = m,
+                                            isPortrait = false,
+                                            onClick = {
+                                                NativePlayerActivity.start(
+                                                    context = context,
+                                                    itemId = m.id,
+                                                    title = m.title,
+                                                    poster = m.poster,
+                                                    isSeries = m.isSeries
+                                                )
+                                            }
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -425,84 +447,123 @@ fun PremiumHeroBanner(item: PlaybackHistoryItem, isPortrait: Boolean = false, on
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(if (isPortrait) 200.dp else 310.dp)
+            .height(if (isPortrait) 220.dp else 290.dp)
             .padding(horizontal = if (isPortrait) 16.dp else 48.dp)
-            .clip(RoundedCornerShape(if (isPortrait) 16.dp else 20.dp))
-            .background(Color(0xFF222222))
+            .clip(RoundedCornerShape(if (isPortrait) 16.dp else 22.dp))
+            .background(Color(0xFF141414))
             .border(
                 width = if (isFocused) 2.dp else 1.dp,
                 color = if (isFocused) Color.White else Color(0x33FFFFFF),
-                shape = RoundedCornerShape(if (isPortrait) 16.dp else 20.dp)
+                shape = RoundedCornerShape(if (isPortrait) 16.dp else 22.dp)
             )
             .clickable(interactionSource = interactionSource, indication = null) { onResume() }
             .focusable(interactionSource = interactionSource)
     ) {
+        // 1. Blurred Poster Background (heavily blurred backdrop)
         if (item.poster != null) {
             AsyncImage(
                 model = item.poster,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier
+                    .fillMaxSize()
+                    .blur(radius = 32.dp)
             )
         }
 
+        // 2. Cinematic Gradient overlay: dark on the left for text readability, fading softly to the right
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(
                     Brush.horizontalGradient(
                         colors = listOf(
-                            Color(0xF5141414),
-                            Color(0xB3141414),
-                            Color(0x33141414),
-                            Color.Transparent
+                            Color(0xFA121212),
+                            Color(0xEE121212),
+                            Color(0xB3121212),
+                            Color(0x66121212)
                         )
                     )
                 )
         )
 
-        Column(
+        // 3. Foreground Content
+        Row(
             modifier = Modifier
-                .align(Alignment.BottomStart)
-                .padding(if (isPortrait) 16.dp else 32.dp),
-            verticalArrangement = Arrangement.spacedBy(if (isPortrait) 6.dp else 10.dp)
+                .fillMaxSize()
+                .padding(if (isPortrait) 14.dp else 20.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = item.title,
-                fontSize = if (isPortrait) 20.sp else 32.sp,
-                fontWeight = FontWeight.Black,
-                color = Color.White,
-                maxLines = 1
-            )
-
-            Text(
-                text = if (item.season != null && item.episode != null) "Сезон ${item.season}, Серия ${item.episode}" else "Фильм",
-                fontSize = if (isPortrait) 13.sp else 15.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color(0xFFAAAAAA)
-            )
-
-            Box(
+            // Left Content: Title, season/episode, play button
+            Column(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(Color.White)
-                    .padding(horizontal = if (isPortrait) 16.dp else 24.dp, vertical = if (isPortrait) 8.dp else 12.dp)
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .padding(end = if (isPortrait) 12.dp else 24.dp),
+                verticalArrangement = Arrangement.Center
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                Text(
+                    text = item.title,
+                    fontSize = if (isPortrait) 20.sp else 30.sp,
+                    fontWeight = FontWeight.Black,
+                    color = Color.White,
+                    maxLines = 2,
+                    lineHeight = if (isPortrait) 24.sp else 36.sp
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = if (item.season != null && item.episode != null) "Сезон ${item.season} • Серия ${item.episode}" else "Фильм",
+                    fontSize = if (isPortrait) 13.sp else 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFFAAAAAA)
+                )
+
+                Spacer(modifier = Modifier.height(if (isPortrait) 14.dp else 22.dp))
+
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (isFocused) Color.White else Color(0xFFE50914))
+                        .padding(horizontal = if (isPortrait) 18.dp else 26.dp, vertical = if (isPortrait) 9.dp else 13.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.PlayArrow,
-                        contentDescription = null,
-                        tint = Color.Black,
-                        modifier = Modifier.size(if (isPortrait) 16.dp else 20.dp)
-                    )
-                    Text(
-                        text = "Смотреть",
-                        color = Color.Black,
-                        fontWeight = FontWeight.Black,
-                        fontSize = if (isPortrait) 12.sp else 14.sp
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.PlayArrow,
+                            contentDescription = null,
+                            tint = if (isFocused) Color.Black else Color.White,
+                            modifier = Modifier.size(if (isPortrait) 18.dp else 22.dp)
+                        )
+                        Text(
+                            text = "Смотреть",
+                            color = if (isFocused) Color.Black else Color.White,
+                            fontWeight = FontWeight.Black,
+                            fontSize = if (isPortrait) 13.sp else 15.sp
+                        )
+                    }
+                }
+            }
+
+            // Right Poster: Full vertical 2:3 poster sharp and clean
+            if (item.poster != null) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .aspectRatio(2f / 3f)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(Color(0xFF141414))
+                        .border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(14.dp))
+                ) {
+                    AsyncImage(
+                        model = item.poster,
+                        contentDescription = item.title,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
                     )
                 }
             }
@@ -517,7 +578,7 @@ fun PremiumContinueCard(item: PlaybackHistoryItem, isPortrait: Boolean = false, 
 
     Column(
         modifier = Modifier
-            .width(if (isPortrait) 160.dp else 220.dp)
+            .then(if (isPortrait) Modifier.width(140.dp) else Modifier.width(160.dp))
             .clip(RoundedCornerShape(14.dp))
             .background(if (isFocused) Color.White else Color(0xFF262626))
             .border(
@@ -532,47 +593,74 @@ fun PremiumContinueCard(item: PlaybackHistoryItem, isPortrait: Boolean = false, 
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .aspectRatio(16f / 9f)
+                .aspectRatio(2f / 3f)
                 .clip(RoundedCornerShape(10.dp))
-                .background(Color(0xFF141414))
+                .background(Color(0xFF141414)),
+            contentAlignment = Alignment.Center
         ) {
             if (item.poster != null) {
                 AsyncImage(
                     model = item.poster,
-                    contentDescription = null,
+                    contentDescription = item.title,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize()
                 )
+            } else {
+                Column(
+                    modifier = Modifier.padding(12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        imageVector = if (item.season != null) Icons.Default.Tv else Icons.Default.Movie,
+                        contentDescription = null,
+                        tint = Color(0xFF666666),
+                        modifier = Modifier.size(36.dp)
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = if (item.season != null) "Сериал" else "Фильм",
+                        color = Color(0xFF888888),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
 
-            Box(
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .size(28.dp)
-                    .clip(CircleShape)
-                    .background(if (isFocused) Color.Black else Color(0x99000000)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.PlayArrow,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(16.dp)
-                )
+            // Progress bar line at the bottom of the poster
+            if (item.durationMs > 0) {
+                val progress = (item.positionMs.toFloat() / item.durationMs.toFloat()).coerceIn(0f, 1f)
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(4.dp)
+                        .align(Alignment.BottomCenter)
+                        .background(Color(0x88000000))
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(progress)
+                            .fillMaxHeight()
+                            .background(Color(0xFFE50914))
+                    )
+                }
             }
         }
 
-        Spacer(modifier = Modifier.height(6.dp))
+        Spacer(modifier = Modifier.height(8.dp))
         Text(
             text = item.title,
-            maxLines = 1,
+            maxLines = 2,
+            minLines = 2,
             color = if (isFocused) Color.Black else Color.White,
             fontWeight = FontWeight.Bold,
-            fontSize = if (isPortrait) 13.sp else 14.sp
+            fontSize = 13.sp,
+            lineHeight = 17.sp
         )
         Text(
             text = if (item.season != null) "С${item.season} • Серия ${item.episode}" else "Фильм",
-            color = if (isFocused) Color(0xFF333333) else Color(0xFFAAAAAA),
+            maxLines = 1,
+            color = if (isFocused) Color(0xFF444444) else Color(0xFFAAAAAA),
             fontSize = 11.sp,
             fontWeight = FontWeight.Medium
         )
@@ -603,25 +691,57 @@ fun PremiumPosterCard(item: MediaItem, isPortrait: Boolean = false, onClick: () 
                 .fillMaxWidth()
                 .aspectRatio(2f / 3f)
                 .clip(RoundedCornerShape(10.dp))
-                .background(Color(0xFF141414))
+                .background(Color(0xFF141414)),
+            contentAlignment = Alignment.Center
         ) {
             if (item.poster != null) {
                 AsyncImage(
                     model = item.poster,
-                    contentDescription = null,
+                    contentDescription = item.title,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize()
                 )
+            } else {
+                Column(
+                    modifier = Modifier.padding(12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        imageVector = if (item.isSeries) Icons.Default.Tv else Icons.Default.Movie,
+                        contentDescription = null,
+                        tint = Color(0xFF666666),
+                        modifier = Modifier.size(36.dp)
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = if (item.isSeries) "Сериал" else "Фильм",
+                        color = Color(0xFF888888),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
         }
-        Spacer(modifier = Modifier.height(6.dp))
+        Spacer(modifier = Modifier.height(8.dp))
         Text(
             text = item.title,
-            maxLines = 1,
+            maxLines = 2,
+            minLines = 2,
             color = if (isFocused) Color.Black else Color.White,
             fontWeight = FontWeight.Bold,
-            fontSize = 13.sp
+            fontSize = 13.sp,
+            lineHeight = 17.sp
         )
+        if (item.description != null) {
+            Text(
+                text = item.description,
+                maxLines = 1,
+                color = if (isFocused) Color(0xFF444444) else Color(0xFFAAAAAA),
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium
+            )
+        }
     }
 }
 

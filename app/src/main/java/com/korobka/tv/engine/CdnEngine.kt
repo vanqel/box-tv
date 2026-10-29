@@ -235,6 +235,8 @@ object CdnEngine {
                     "https://st.kp.yandex.net/images/film_iphone/iphone360_$kpId.jpg"
                 } else null
 
+                android.util.Log.d("CdnEngine", "Search item: id=$finalId, title=$title, poster=$poster, isSeries=$isSeries")
+
                 results.add(
                     MediaItem(
                         id = finalId,
