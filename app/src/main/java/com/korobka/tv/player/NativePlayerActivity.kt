@@ -502,49 +502,56 @@ fun NativePlayerScreen(
             }
         }
 
-        // Floating Pause Cue Button / Bottom drawer trigger
+        // Bottom Pause Cue Hint (Subtle gradient shade, large text glued to bottom)
         AnimatedVisibility(
             visible = !exoplayer.isPlaying && !isDrawerOpenState.value && !isLoading,
             enter = fadeIn() + slideInVertically { it / 2 },
             exit = fadeOut() + slideOutVertically { it / 2 },
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = if (isPortrait) 32.dp else 48.dp)
+            modifier = Modifier.align(Alignment.BottomCenter)
         ) {
             val cueInteraction = remember { MutableInteractionSource() }
             val isCueFocused by cueInteraction.collectIsFocusedAsState()
 
             Box(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(30.dp))
-                    .background(if (isCueFocused) Color.White else Color(0xDD222222))
-                    .border(
-                        width = if (isCueFocused) 1.5.dp else 1.dp,
-                        color = if (isCueFocused) Color.White else Color(0x55FFFFFF),
-                        shape = RoundedCornerShape(30.dp)
+                    .fillMaxWidth()
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                Color.Transparent,
+                                Color(0x66000000),
+                                Color(0xEE000000)
+                            )
+                        )
                     )
                     .clickable(interactionSource = cueInteraction, indication = null) {
                         isDrawerOpenState.value = true
                     }
                     .focusable(interactionSource = cueInteraction)
-                    .padding(horizontal = 24.dp, vertical = 12.dp),
+                    .padding(
+                        start = horizontalPadding,
+                        end = horizontalPadding,
+                        top = 28.dp,
+                        bottom = if (isPortrait) 16.dp else 18.dp
+                    ),
                 contentAlignment = Alignment.Center
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.KeyboardArrowUp,
                         contentDescription = null,
-                        tint = if (isCueFocused) Color.Black else Color.White,
-                        modifier = Modifier.size(20.dp)
+                        tint = if (isCueFocused) Color.White else Color(0xDDFFFFFF),
+                        modifier = Modifier.size(24.dp)
                     )
                     Text(
                         text = if (isPortrait) "Меню серий и настроек (свайп вверх)" else "Меню серий и настроек (стрелка вниз)",
-                        color = if (isCueFocused) Color.Black else Color.White,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 13.sp
+                        color = if (isCueFocused) Color.White else Color(0xDDFFFFFF),
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = if (isPortrait) 16.sp else 18.sp,
+                        letterSpacing = 0.2.sp
                     )
                 }
             }
