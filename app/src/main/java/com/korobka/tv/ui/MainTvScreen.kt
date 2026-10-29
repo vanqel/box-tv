@@ -90,7 +90,7 @@ fun MainTvScreen() {
                             Color.Transparent
                         ),
                         center = Offset(Float.POSITIVE_INFINITY, 50f),
-                        radius = 850f
+                        radius = 350f
                     )
                 )
         )
@@ -106,7 +106,7 @@ fun MainTvScreen() {
                             Color.Transparent
                         ),
                         center = Offset(0f, 650f),
-                        radius = 750f
+                        radius = 350f
                     )
                 )
         )
@@ -122,7 +122,7 @@ fun MainTvScreen() {
                             Color.Transparent
                         ),
                         center = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY),
-                        radius = 900f
+                        radius = 400f
                     )
                 )
         )
@@ -222,7 +222,10 @@ fun MainTvScreen() {
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = screenHorizontalPadding, vertical = if (isPortrait) 12.dp else 20.dp)
+                                .padding(
+                                    horizontal = screenHorizontalPadding,
+                                    vertical = if (isPortrait) 12.dp else 20.dp
+                                )
                         ) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
@@ -290,7 +293,10 @@ fun MainTvScreen() {
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = screenHorizontalPadding, vertical = if (isPortrait) 12.dp else 20.dp)
+                                .padding(
+                                    horizontal = screenHorizontalPadding,
+                                    vertical = if (isPortrait) 12.dp else 20.dp
+                                )
                         ) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
@@ -373,7 +379,10 @@ fun MainTvScreen() {
                         )
 
                         if (isSearching) {
-                            Box(modifier = Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
+                            Box(
+                                modifier = Modifier.fillMaxWidth().padding(24.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
                                 CircularProgressIndicator(color = Color.White)
                             }
                         } else if (searchResults.isNotEmpty()) {
@@ -432,7 +441,10 @@ fun MainTvScreen() {
 
                         if (isSearching) {
                             item {
-                                Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                                Box(
+                                    modifier = Modifier.fillMaxWidth().padding(32.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
                                     CircularProgressIndicator(color = Color.White)
                                 }
                             }
@@ -546,13 +558,55 @@ fun PremiumHeroBanner(item: PlaybackHistoryItem, isPortrait: Boolean = false, on
                 var retriever: MediaMetadataRetriever? = null
                 try {
                     retriever = MediaMetadataRetriever()
+                    // Resolve actual media segment for native frame extraction
+                    val targetMediaUrl = if (hls.contains(".m3u8")) {
+                        try {
+                            val client = okhttp3.OkHttpClient.Builder()
+                                .connectTimeout(3, java.util.concurrent.TimeUnit.SECONDS)
+                                .readTimeout(3, java.util.concurrent.TimeUnit.SECONDS)
+                                .build()
+                            val req = okhttp3.Request.Builder()
+                                .url(hls)
+                                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                                .build()
+                            val body = client.newCall(req).execute().body?.string() ?: ""
+                            var subM3u8 = ""
+                            for (line in body.lines()) {
+                                if (line.startsWith("http") && line.contains(".m3u8")) {
+                                    subM3u8 = line.trim()
+                                    break
+                                }
+                            }
+                            if (subM3u8.isNotEmpty()) {
+                                val subReq = okhttp3.Request.Builder()
+                                    .url(subM3u8)
+                                    .header(
+                                        "User-Agent",
+                                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                                    )
+                                    .build()
+                                val subBody = client.newCall(subReq).execute().body?.string() ?: ""
+                                val segments = subBody.lines().filter { it.contains(".ts") || it.contains(".mp4") }
+                                val secPos = (item.positionMs / 1000).toInt()
+                                val segIndex = (secPos / 10).coerceIn(0, (segments.size - 1).coerceAtLeast(0))
+                                if (segments.isNotEmpty()) {
+                                    val segLine = segments[segIndex].trim()
+                                    if (segLine.startsWith("http")) segLine
+                                    else subM3u8.substringBeforeLast("/") + "/" + segLine
+                                } else subM3u8
+                            } else hls
+                        } catch (_: Exception) {
+                            hls
+                        }
+                    } else hls
+
                     val headers = hashMapOf(
                         "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
                     )
-                    retriever.setDataSource(hls, headers)
-                    // Convert positionMs to microseconds (coerce at least 5s)
-                    val targetUs = if (item.positionMs > 5000L) item.positionMs * 1000L else 120_000_000L
+                    retriever.setDataSource(targetMediaUrl, headers)
+                    val targetUs = if (item.positionMs > 2000L) (item.positionMs % 10_000) * 1000L else 1_000_000L
                     val bmp = retriever.getFrameAtTime(targetUs, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                        ?: retriever.frameAtTime
                     if (bmp != null) {
                         pausedFrameBitmap = bmp
                     }
@@ -560,7 +614,8 @@ fun PremiumHeroBanner(item: PlaybackHistoryItem, isPortrait: Boolean = false, on
                 } finally {
                     try {
                         retriever?.release()
-                    } catch (_: Exception) {}
+                    } catch (_: Exception) {
+                    }
                 }
             }
         }
@@ -674,7 +729,10 @@ fun PremiumHeroBanner(item: PlaybackHistoryItem, isPortrait: Boolean = false, on
                     modifier = Modifier
                         .clip(RoundedCornerShape(12.dp))
                         .background(if (isFocused) Color.White else Color(0xFFE50914))
-                        .padding(horizontal = if (isPortrait) 18.dp else 26.dp, vertical = if (isPortrait) 9.dp else 13.dp)
+                        .padding(
+                            horizontal = if (isPortrait) 18.dp else 26.dp,
+                            vertical = if (isPortrait) 9.dp else 13.dp
+                        )
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -945,150 +1003,35 @@ fun NativeSearchKeyboard(
 ) {
     val keyboardController = LocalSoftwareKeyboardController.current
 
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(Color(0xFF222222))
-            .border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(16.dp))
-            .padding(if (isPortrait) 14.dp else 20.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        // Native touch text input for smartphones & tablets
-        OutlinedTextField(
-            value = query,
-            onValueChange = onQueryChange,
-            placeholder = { Text("Поиск фильмов и сериалов...", color = Color(0xFF737373)) },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedTextColor = Color.White,
-                unfocusedTextColor = Color.White,
-                focusedBorderColor = Color.White,
-                unfocusedBorderColor = Color(0x44FFFFFF),
-                cursorColor = Color.White
-            ),
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-            keyboardActions = KeyboardActions(
-                onSearch = {
-                    keyboardController?.hide()
-                    onSearch()
-                }
-            ),
-            trailingIcon = {
-                IconButton(onClick = {
-                    keyboardController?.hide()
-                    onSearch()
-                }) {
-                    Icon(imageVector = Icons.Default.Search, contentDescription = "Поиск", tint = Color.White)
-                }
+    // Native touch text input for smartphones & tablets
+    OutlinedTextField(
+        value = query,
+        onValueChange = onQueryChange,
+        placeholder = { Text("Поиск фильмов и сериалов...", color = Color(0xFF737373)) },
+        modifier = Modifier.fillMaxWidth(),
+        singleLine = true,
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedTextColor = Color.White,
+            unfocusedTextColor = Color.White,
+            focusedBorderColor = Color.White,
+            unfocusedBorderColor = Color(0x44FFFFFF),
+            cursorColor = Color.White
+        ),
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+        keyboardActions = KeyboardActions(
+            onSearch = {
+                keyboardController?.hide()
+                onSearch()
             }
-        )
-
-        // D-pad onscreen keyboard (shown on landscape / TV screen)
-        if (!isPortrait) {
-            val rows = listOf(
-                listOf("Й", "Ц", "У", "К", "Е", "Н", "Г", "Ш", "Щ", "З", "Х"),
-                listOf("Ф", "Ы", "В", "А", "П", "Р", "О", "Л", "Д", "Ж", "Э"),
-                listOf("Я", "Ч", "С", "М", "И", "Т", "Ь", "Б", "Ю", "1", "2")
-            )
-
-            rows.forEach { row ->
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    row.forEach { char ->
-                        val interactionSource = remember { MutableInteractionSource() }
-                        val isFocused by interactionSource.collectIsFocusedAsState()
-
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(RoundedCornerShape(7.dp))
-                                .background(if (isFocused) Color.White else Color(0xFF333333))
-                                .border(
-                                    width = if (isFocused) 1.5.dp else 0.5.dp,
-                                    color = if (isFocused) Color.White else Color(0x22FFFFFF),
-                                    shape = RoundedCornerShape(7.dp)
-                                )
-                                .clickable(interactionSource = interactionSource, indication = null) { onQueryChange(query + char) }
-                                .focusable(interactionSource = interactionSource),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = char,
-                                color = if (isFocused) Color.Black else Color.White,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 15.sp
-                            )
-                        }
-                    }
-                }
-            }
-
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                val spaceInteractionSource = remember { MutableInteractionSource() }
-                val isSpaceFocused by spaceInteractionSource.collectIsFocusedAsState()
-                Box(
-                    modifier = Modifier
-                        .width(130.dp)
-                        .height(38.dp)
-                        .clip(RoundedCornerShape(9.dp))
-                        .background(if (isSpaceFocused) Color.White else Color(0xFF333333))
-                        .border(if (isSpaceFocused) 1.5.dp else 1.dp, if (isSpaceFocused) Color.White else Color(0x33FFFFFF), RoundedCornerShape(9.dp))
-                        .clickable(interactionSource = spaceInteractionSource, indication = null) { onQueryChange("$query ") }
-                        .focusable(interactionSource = spaceInteractionSource),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "Пробел",
-                        color = if (isSpaceFocused) Color.Black else Color.White,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 13.sp
-                    )
-                }
-
-                val delInteractionSource = remember { MutableInteractionSource() }
-                val isDelFocused by delInteractionSource.collectIsFocusedAsState()
-                Box(
-                    modifier = Modifier
-                        .width(100.dp)
-                        .height(38.dp)
-                        .clip(RoundedCornerShape(9.dp))
-                        .background(if (isDelFocused) Color.White else Color(0xFF333333))
-                        .border(if (isDelFocused) 1.5.dp else 1.dp, if (isDelFocused) Color.White else Color(0x33FFFFFF), RoundedCornerShape(9.dp))
-                        .clickable(interactionSource = delInteractionSource, indication = null) { if (query.isNotEmpty()) onQueryChange(query.dropLast(1)) }
-                        .focusable(interactionSource = delInteractionSource),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "Стереть",
-                        color = if (isDelFocused) Color.Black else Color.White,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 13.sp
-                    )
-                }
-
-                val searchInteractionSource = remember { MutableInteractionSource() }
-                val isSearchFocused by searchInteractionSource.collectIsFocusedAsState()
-                Box(
-                    modifier = Modifier
-                        .width(100.dp)
-                        .height(38.dp)
-                        .clip(RoundedCornerShape(9.dp))
-                        .background(if (isSearchFocused) Color.White else Color(0xFF444444))
-                        .border(if (isSearchFocused) 1.5.dp else 1.dp, if (isSearchFocused) Color.White else Color(0x33FFFFFF), RoundedCornerShape(9.dp))
-                        .clickable(interactionSource = searchInteractionSource, indication = null) { onSearch() }
-                        .focusable(interactionSource = searchInteractionSource),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "Найти",
-                        color = if (isSearchFocused) Color.Black else Color.White,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 13.sp
-                    )
-                }
+        ),
+        trailingIcon = {
+            IconButton(onClick = {
+                keyboardController?.hide()
+                onSearch()
+            }) {
+                Icon(imageVector = Icons.Default.Search, contentDescription = "Поиск", tint = Color.White)
             }
         }
-    }
+    )
+
 }

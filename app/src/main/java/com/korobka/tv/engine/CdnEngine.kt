@@ -80,6 +80,8 @@ object CdnEngine {
                                 val epObj = epsArr.getJSONObject(j)
                                 val epNum = epObj.optInt("episode", j + 1)
                                 val hls = epObj.optString("hls", "")
+                                val rawPoster = epObj.optString("poster", "")
+                                val epPoster = if (rawPoster.isNotEmpty() && !rawPoster.startsWith("data:image")) rawPoster else null
 
                                 if (sNum == seasonNum && epNum == episodeNum) {
                                     if (hls.isNotEmpty()) episodeHls = hls
@@ -95,7 +97,7 @@ object CdnEngine {
                                     }
                                 }
 
-                                epList.add(Episode(epNum, "Серия $epNum", hls))
+                                epList.add(Episode(epNum, "Серия $epNum", hls, epPoster))
                             }
                             seasons.add(Season(sNum, epList))
                         }

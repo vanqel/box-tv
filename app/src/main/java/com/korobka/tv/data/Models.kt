@@ -17,7 +17,8 @@ data class MediaItem(
 data class Episode(
     val episodeNumber: Int,
     val title: String,
-    val hlsUrl: String? = null
+    val hlsUrl: String? = null,
+    val posterUrl: String? = null
 )
 
 data class Season(

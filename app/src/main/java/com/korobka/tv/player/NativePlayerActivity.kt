@@ -65,6 +65,92 @@ import com.korobka.tv.data.PlaybackHistoryItem
 import com.korobka.tv.data.StreamSource
 import com.korobka.tv.engine.CdnEngine
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
+import java.util.concurrent.ConcurrentHashMap
+
+// Global cache for episode frame bitmaps so they never re-download or flicker when scrolling
+object FrameCache {
+    val bitmapCache = ConcurrentHashMap<String, Bitmap>()
+    val downloadSemaphore = Semaphore(3) // Strict 3 concurrent requests max
+}
+
+suspend fun preloadFrame(hlsUrl: String): Bitmap? = withContext(Dispatchers.IO) {
+    if (hlsUrl.isEmpty()) return@withContext null
+    val existing = FrameCache.bitmapCache[hlsUrl]
+    if (existing != null) return@withContext existing
+
+    FrameCache.downloadSemaphore.withPermit {
+        val doubleCheck = FrameCache.bitmapCache[hlsUrl]
+        if (doubleCheck != null) return@withPermit doubleCheck
+
+        var retriever: MediaMetadataRetriever? = null
+        try {
+            retriever = MediaMetadataRetriever()
+            val targetMediaUrl = if (hlsUrl.contains(".m3u8")) {
+                try {
+                    val client = okhttp3.OkHttpClient.Builder()
+                        .connectTimeout(3, java.util.concurrent.TimeUnit.SECONDS)
+                        .readTimeout(3, java.util.concurrent.TimeUnit.SECONDS)
+                        .build()
+                    val req = okhttp3.Request.Builder()
+                        .url(hlsUrl)
+                        .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                        .build()
+                    val body = client.newCall(req).execute().body?.string() ?: ""
+
+                    // Pick low-res 360p or 480p variant
+                    val m3u8Lines = body.lines().filter { it.startsWith("http") && it.contains(".m3u8") }
+                    val subM3u8 = m3u8Lines.find { it.contains("360") || it.contains("v2") }
+                        ?: m3u8Lines.lastOrNull()
+                        ?: m3u8Lines.firstOrNull()
+                        ?: ""
+
+                    if (subM3u8.isNotEmpty()) {
+                        val subReq = okhttp3.Request.Builder()
+                            .url(subM3u8)
+                            .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                            .build()
+                        val subBody = client.newCall(subReq).execute().body?.string() ?: ""
+                        val segments = subBody.lines().filter { it.contains(".ts") || it.contains(".mp4") }
+                        // 360th second (each segment ~10s, so segment index 36)
+                        val segIndex = (36).coerceIn(0, (segments.size - 1).coerceAtLeast(0))
+                        if (segments.isNotEmpty()) {
+                            val segLine = segments[segIndex].trim()
+                            if (segLine.startsWith("http")) segLine
+                            else subM3u8.substringBeforeLast("/") + "/" + segLine
+                        } else subM3u8
+                    } else hlsUrl
+                } catch (_: Exception) {
+                    hlsUrl
+                }
+            } else hlsUrl
+
+            val headers = hashMapOf(
+                "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+            )
+            retriever.setDataSource(targetMediaUrl, headers)
+            // 360 seconds = 360 * 1_000_000 microseconds
+            val bmp = retriever.getFrameAtTime(360_000_000L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                ?: retriever.getFrameAtTime(120_000_000L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                ?: retriever.getFrameAtTime(1_000_000L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                ?: retriever.frameAtTime
+
+            if (bmp != null) {
+                val scaled = Bitmap.createScaledBitmap(bmp, 320, 180, true)
+                FrameCache.bitmapCache[hlsUrl] = scaled
+                return@withPermit scaled
+            }
+        } catch (_: Exception) {
+        } finally {
+            try {
+                retriever?.release()
+            } catch (_: Exception) {}
+        }
+        null
+    }
+}
 
 class NativePlayerActivity : ComponentActivity() {
     companion object {
@@ -334,6 +420,17 @@ fun NativePlayerScreen(
 
                 delay(800)
                 applyAudioTrack(targetIdx)
+            }
+
+            // Proactively preload episode frames for the current season in background
+            val currentSeasonEpisodes = src.seasons.find { it.seasonNumber == currentSeason }?.episodes.orEmpty()
+            currentSeasonEpisodes.forEach { ep ->
+                val epHls = ep.hlsUrl
+                if (!epHls.isNullOrEmpty() && !FrameCache.bitmapCache.containsKey(epHls)) {
+                    kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+                        preloadFrame(epHls)
+                    }
+                }
             }
         }
     }
@@ -729,16 +826,28 @@ fun NativePlayerScreen(
                         }
 
                         val episodes = streamSource?.seasons?.find { it.seasonNumber == selectedDrawerSeason }?.episodes.orEmpty()
+                        LaunchedEffect(selectedDrawerSeason, episodes) {
+                            episodes.forEach { ep ->
+                                val epHls = ep.hlsUrl
+                                if (!epHls.isNullOrEmpty() && !FrameCache.bitmapCache.containsKey(epHls)) {
+                                    kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+                                        preloadFrame(epHls)
+                                    }
+                                }
+                            }
+                        }
+
                         LazyRow(
                             horizontalArrangement = Arrangement.spacedBy(14.dp),
                             contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp)
                         ) {
                             items(episodes) { ep ->
                                 val isCurrent = currentSeason == selectedDrawerSeason && currentEpisode == ep.episodeNumber
+                                val episodePoster = ep.posterUrl ?: poster
                                 HighContrastEpisodeCard(
                                     episodeNumber = ep.episodeNumber,
                                     isCurrent = isCurrent,
-                                    posterUrl = poster,
+                                    posterUrl = episodePoster,
                                     hlsUrl = ep.hlsUrl,
                                     onFocused = { isAtDrawerTopState.value = false },
                                     onClick = {
@@ -1094,30 +1203,15 @@ fun HighContrastEpisodeCard(
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
 
-    var frameBitmap by remember(hlsUrl) { mutableStateOf<Bitmap?>(null) }
+    val cached = remember(hlsUrl) { if (!hlsUrl.isNullOrEmpty()) FrameCache.bitmapCache[hlsUrl] else null }
+    var frameBitmap by remember(hlsUrl) { mutableStateOf<Bitmap?>(cached) }
 
-    // Fetch video frame at 120 seconds in background coroutine
+    // Fetch video frame at 360 seconds in 360p/480p with semaphore limiting to 3 concurrent requests
     LaunchedEffect(hlsUrl) {
-        if (!hlsUrl.isNullOrEmpty()) {
-            withContext(Dispatchers.IO) {
-                var retriever: MediaMetadataRetriever? = null
-                try {
-                    retriever = MediaMetadataRetriever()
-                    val headers = hashMapOf(
-                        "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-                    )
-                    retriever.setDataSource(hlsUrl, headers)
-                    // 120 seconds in microseconds = 120 * 1_000_000
-                    val bmp = retriever.getFrameAtTime(120_000_000L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
-                    if (bmp != null) {
-                        frameBitmap = bmp
-                    }
-                } catch (_: Exception) {
-                } finally {
-                    try {
-                        retriever?.release()
-                    } catch (_: Exception) {}
-                }
+        if (!hlsUrl.isNullOrEmpty() && frameBitmap == null) {
+            val bmp = preloadFrame(hlsUrl)
+            if (bmp != null) {
+                frameBitmap = bmp
             }
         }
     }
